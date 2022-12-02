@@ -46,7 +46,7 @@
 
   - name: Copy console, console_libraries
     copy: 
-      src: /tmp/prometheus/{{  item  }}
+      src: /tmp/prometheus-{{prom_ver}}.linux-amd64/{{  item  }}
       dest: /etc/prometheus
       owner: prometheus 
       group: prometheus
