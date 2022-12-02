@@ -1,0 +1,85 @@
+
+## ansible-playbook main.yaml -i inventory --extra-vars "prom_ver"='2.30.3'
+- name: Run
+  hosts: all
+  tasks:
+  - name: Download Prometheus binary
+    get_url:
+      url: https://github.com/prometheus/prometheus/releases/download/v{{prom_ver}}/prometheus-{{prom_ver}}.linux-amd64.tar.gz
+      dest: /tmp
+      mode: '06440'
+
+  - name: Create user for prometheus
+    user:
+      name: prometheus
+      shell: /bin/false
+      create_home: false
+
+  - name: Create binary and config dir
+    file:
+      path: "{{  item  }}"
+      state: directory
+      owner: prometheus
+      group: prometheus
+      mode: '0744'
+    loop: 
+      - /etc/prometheus
+      - /var/lib/prometheus
+
+  - name: Extract binary file
+    unarchive:
+      src: /tmp/prometheus-{{prom_ver}}.linux-amd64.tar.gz
+      dest: /tmp
+      remote_src: yes
+  
+  - name: Copy binary
+    copy: 
+      src: /tmp/prometheus-{{prom_ver}}.linux-amd64/{{  item  }}
+      dest: /usr/local/bin
+      owner: prometheus 
+      group: prometheus
+      mode: 0744
+      remote_src: yes
+    loop:
+      - prometheus
+      - promtool
+
+  - name: Copy console, console_libraries
+    copy: 
+      src: /tmp/prometheus/{{  item  }}
+      dest: /etc/prometheus
+      owner: prometheus 
+      group: prometheus
+      mode: 0744
+      remote_src: yes
+    loop:
+      - consoles
+      - console_libraries
+
+  - name: Change file ownership, group and permissions
+    file:
+      path: /etc/prometheus/prometheus.yml
+      state: touch
+      owner: prometheus
+      group: prometheus
+      mode: '0644'
+
+  - name: Copy serviced
+    copy: 
+      src: prometheus.service
+      dest: /etc/systemd/system/
+      owner: root 
+      group: root
+      mode: '0755'
+
+  - name: reload system daemon
+    systemd:
+      name: prometheus
+      daemon_reload: yes
+      state: started
+      enabled: yes
+
+  - name: reload prometheus
+    systemd:
+      name: prometheus
+      state: restarted
